@@ -1,0 +1,25 @@
+@"
+# Node
+node_modules/
+npm-debug.log*
+yarn.lock
+pnpm-lock.yaml
+
+# Build / cache
+dist/
+build/
+.cache/
+coverage/
+
+# Envs & secrets
+.env
+**/.env
+**/.env.local
+
+# Uploads
+uploads/
+
+# OS crap
+.DS_Store
+Thumbs.db
+"@ | Out-File -Encoding utf8 .gitignore
