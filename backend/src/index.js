@@ -34,3 +34,5 @@ app.use('/api/auth', rateLimit, require('./routes/auth'));
 app.use('/api/admin/audit', require('./routes/admin/audit'));
 app.use('/api/cost', require('./routes/cost'));
 app.use('/api/vehicles', require('./routes/vehicles'));
+app.use('/api/customers', require('./routes/customers'));
+app.use('/api/quotes', require('./routes/quotes'));

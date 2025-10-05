@@ -125,3 +125,42 @@ CREATE TABLE IF NOT EXISTS vehicles (
 
 CREATE UNIQUE INDEX IF NOT EXISTS vehicles_org_immatriculation_uk
   ON vehicles(organization_id, immatriculation);
+
+-- Clients
+CREATE TABLE IF NOT EXISTS customers (
+  id SERIAL PRIMARY KEY,
+  organization_id INT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  address TEXT,
+  vat_number TEXT,
+  email TEXT,
+  phone TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS customers_org_idx ON customers(organization_id,name);
+
+-- Devis
+CREATE TABLE IF NOT EXISTS quotes (
+  id SERIAL PRIMARY KEY,
+  organization_id INT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  customer_id INT NOT NULL REFERENCES customers(id) ON DELETE RESTRICT,
+  number TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'DRAFT', -- DRAFT|SENT|ACCEPTED|REJECTED
+  currency TEXT NOT NULL DEFAULT 'EUR',
+  margin_percent DECIMAL(5,2) NOT NULL DEFAULT 10.0,
+  notes TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS quotes_org_number_uk ON quotes(organization_id, number);
+
+-- Lignes de devis
+CREATE TABLE IF NOT EXISTS quote_items (
+  id SERIAL PRIMARY KEY,
+  quote_id INT NOT NULL REFERENCES quotes(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL,            -- KM|H|FIXED
+  label TEXT NOT NULL,
+  qty DECIMAL(12,3) NOT NULL DEFAULT 0,
+  unit_price DECIMAL(12,4) NOT NULL DEFAULT 0,
+  line_total DECIMAL(12,4) NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS quote_items_quote_idx ON quote_items(quote_id);
