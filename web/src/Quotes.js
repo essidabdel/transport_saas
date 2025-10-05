@@ -1,24 +1,51 @@
+// web/src/Quotes.js
 import React, { useEffect, useState } from 'react';
 import { apiFetch } from './api';
 
 export default function Quotes(){
   const [quotes,setQuotes]=useState([]);
   const [customers,setCustomers]=useState([]);
+  const [vehicles,setVehicles]=useState([]);
+  const [drivers,setDrivers]=useState([]);
+
   const [items,setItems]=useState([{ kind:'KM', label:'Kilométrage', qty:0, unit_price:0 }]);
   const [customerId,setCustomerId]=useState('');
   const [margin,setMargin]=useState(10);
   const [notes,setNotes]=useState('');
   const [pdf,setPdf]=useState('');
 
-  const load=async()=>{
+  const [vehId,setVehId]=useState('');
+  const [drvId,setDrvId]=useState('');
+  const [eurKm,setEurKm]=useState(null);
+  const [eurH,setEurH]=useState(null);
+  const [drvCost,setDrvCost]=useState(null);
+
+  const load = async ()=>{
     const r1=await apiFetch('/api/quotes'); if(r1.ok) setQuotes(await r1.json());
     const r2=await apiFetch('/api/customers'); if(r2.ok) setCustomers(await r2.json());
+    const r3=await apiFetch('/api/vehicles'); if(r3.ok) setVehicles(await r3.json());
+    const r4=await apiFetch('/api/drivers'); if(r4.ok) setDrivers(await r4.json());
   };
   useEffect(()=>{ load(); },[]);
+
+  useEffect(()=>{ (async()=>{
+    const qs = vehId ? `?vehicle_id=${vehId}` : '';
+    const r = await apiFetch('/api/cost/compute'+qs);
+    if (r.ok) { const d=await r.json(); setEurKm(d.eur_km_variable); setEurH(d.eur_hour); }
+  })(); },[vehId]);
+
+  useEffect(()=>{ 
+    if(!drvId){ setDrvCost(null); return; }
+    const d = drivers.find(x=>String(x.id)===String(drvId)); 
+    setDrvCost(d? Number(d.cout_horaire||0) : null);
+  },[drvId, drivers]);
 
   const addItem=()=>setItems([...items,{ kind:'KM', label:'', qty:0, unit_price:0 }]);
   const delItem=i=>setItems(items.filter((_,idx)=>idx!==i));
   const setItem=(i,k,v)=>setItems(items.map((it,idx)=>idx===i?{...it,[k]:v}:it));
+
+  const applyKm=()=>{ if(eurKm==null) return; setItems(items.map(it=> it.kind==='KM' ? {...it, unit_price: Number(eurKm)} : it )); };
+  const applyH =()=>{ const pu = drvCost ?? eurH ?? 0; setItems(items.map(it=> it.kind==='H' ? {...it, unit_price: Number(pu)} : it )); };
 
   const subtotal = items.reduce((s,it)=>s+(Number(it.qty||0)*Number(it.unit_price||0)),0);
   const total = subtotal * (1 + Number(margin||0)/100);
@@ -39,12 +66,30 @@ export default function Quotes(){
       <h3>Devis</h3>
 
       <div style={{marginTop:8,border:'1px solid #eee',borderRadius:8,overflow:'hidden'}}>
-        <div style={{display:'grid',gridTemplateColumns:'120px 1fr 120px 120px 120px',gap:8,padding:'8px 12px',background:'#fafafa',fontWeight:600}}>
+        <div style={{display:'grid',gridTemplateColumns:'120px 1fr 160px 120px 120px',gap:8,padding:'8px 12px',background:'#fafafa',fontWeight:600}}>
           <div>N°</div><div>Client</div><div>Statut</div><div>Marge %</div><div>PDF</div>
         </div>
         {quotes.map(q=>(
-          <div key={q.id} style={{display:'grid',gridTemplateColumns:'120px 1fr 120px 120px 120px',gap:8,padding:'8px 12px',borderTop:'1px solid #eee'}}>
-            <div>{q.number}</div><div>{q.customer_name}</div><div>{q.status}</div><div>{q.margin_percent}</div>
+          <div key={q.id} style={{display:'grid',gridTemplateColumns:'120px 1fr 160px 120px 120px',gap:8,padding:'8px 12px',borderTop:'1px solid #eee'}}>
+            <div>{q.number}</div>
+            <div>{q.customer_name}</div>
+            <div style={{display:'flex',gap:6,alignItems:'center'}}>
+              <span>{q.status}</span>
+              <select onChange={async e=>{
+                const r = await apiFetch(`/api/quotes/${q.id}/status`, {method:'POST', body: JSON.stringify({ status: e.target.value })});
+                if (r.ok) {
+                  const upd = await r.json();
+                  setQuotes(prev=>prev.map(x=>x.id===q.id?{...x,status:upd.status}:x));
+                }
+              }} value="">
+                <option value="" disabled>Changer…</option>
+                <option value="DRAFT">DRAFT</option>
+                <option value="SENT">SENT</option>
+                <option value="ACCEPTED">ACCEPTED</option>
+                <option value="REJECTED">REJECTED</option>
+              </select>
+            </div>
+            <div>{q.margin_percent}</div>
             <div><button onClick={()=>makePdf(q.id)}>Générer PDF</button></div>
           </div>
         ))}
@@ -53,7 +98,8 @@ export default function Quotes(){
       {pdf && <div style={{marginTop:8}}><a href={pdf} target="_blank" rel="noreferrer">Ouvrir le PDF</a></div>}
 
       <h4 style={{marginTop:16}}>Nouveau devis</h4>
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,maxWidth:900}}>
+
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,alignItems:'end',maxWidth:1000}}>
         <label>Client
           <select value={customerId} onChange={e=>setCustomerId(e.target.value)} style={{width:'100%',padding:8}}>
             <option value="">— Choisir —</option>
@@ -61,6 +107,25 @@ export default function Quotes(){
           </select>
         </label>
         <label>Marge (%)<input type="number" step="0.1" value={margin} onChange={e=>setMargin(e.target.value)} style={{width:'100%',padding:8}}/></label>
+        <div />
+        <label>Véhicule (€/km)
+          <select value={vehId} onChange={e=>setVehId(e.target.value)} style={{width:'100%',padding:8}}>
+            <option value="">— défauts entreprise —</option>
+            {vehicles.map(v=><option key={v.id} value={v.id}>{v.immatriculation} • {v.marque||''} {v.modele||''}</option>)}
+          </select>
+          <div style={{fontSize:12,color:'#555',marginTop:4}}>€/km estimé: <b>{eurKm!=null? eurKm.toFixed(3) : '—'}</b></div>
+        </label>
+        <label>Chauffeur (€/h)
+          <select value={drvId} onChange={e=>setDrvId(e.target.value)} style={{width:'100%',padding:8}}>
+            <option value="">— défauts entreprise —</option>
+            {drivers.map(d=><option key={d.id} value={d.id}>{d.full_name}</option>)}
+          </select>
+          <div style={{fontSize:12,color:'#555',marginTop:4}}>€/h estimé: <b>{(drvCost ?? eurH ?? 0).toFixed(2)}</b></div>
+        </label>
+        <div style={{display:'flex',gap:8}}>
+          <button type="button" onClick={applyKm}>Appliquer PU aux lignes KM</button>
+          <button type="button" onClick={applyH}>Appliquer PU aux lignes H</button>
+        </div>
       </div>
 
       <div style={{marginTop:8,border:'1px solid #eee',borderRadius:8,padding:12}}>

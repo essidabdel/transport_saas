@@ -36,3 +36,5 @@ app.use('/api/cost', require('./routes/cost'));
 app.use('/api/vehicles', require('./routes/vehicles'));
 app.use('/api/customers', require('./routes/customers'));
 app.use('/api/quotes', require('./routes/quotes'));
+app.use('/api/drivers', require('./routes/drivers'));
+app.use('/api/maintenance', require('./routes/maintenance'));

@@ -164,3 +164,39 @@ CREATE TABLE IF NOT EXISTS quote_items (
   line_total DECIMAL(12,4) NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS quote_items_quote_idx ON quote_items(quote_id);
+CREATE TABLE IF NOT EXISTS drivers (
+  id SERIAL PRIMARY KEY,
+  organization_id INT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  full_name TEXT NOT NULL,
+  email TEXT,
+  phone TEXT,
+  -- base de calcul
+  salaire_brut_mensuel DECIMAL(10,2) NOT NULL DEFAULT 2000.00,
+  charges_patronales_pct DECIMAL(5,2) NOT NULL DEFAULT 42.00,   -- %
+  frais_generaux_pct DECIMAL(5,2) NOT NULL DEFAULT 10.00,       -- %
+  heures_productives_mois DECIMAL(6,2) NOT NULL DEFAULT 140.00, -- h/mois facturables
+  -- dérivé (optionnel, on recalcule côté API)
+  cout_horaire DECIMAL(10,2),
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS drivers_org_idx ON drivers(organization_id,full_name);
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS sent_at TIMESTAMP;
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS accepted_at TIMESTAMP;
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS rejected_at TIMESTAMP;
+
+CREATE TABLE IF NOT EXISTS maintenance (
+  id SERIAL PRIMARY KEY,
+  organization_id INT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  vehicle_id INT NOT NULL REFERENCES vehicles(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL,                       -- ENTRETIEN|CT|ASSURANCE|AUTRE
+  due_date DATE,                            -- optionnel
+  due_km INT,                               -- optionnel
+  notes TEXT,
+  done BOOLEAN NOT NULL DEFAULT FALSE,
+  done_at TIMESTAMP,
+  mileage_at_done INT,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS maintenance_org_due_idx ON maintenance(organization_id, due_date, done);

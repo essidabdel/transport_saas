@@ -7,6 +7,9 @@ import CostWidget from './CostWidget';
 import Vehicles from './Vehicles';
 import Customers from './Customers';
 import Quotes from './Quotes';
+import Drivers from './Drivers';
+import AlertsWidget from './AlertsWidget';
+import Maintenance from './Maintenance';
 
 export default function Client({ email, onLogout }) {
   const [ready, setReady] = useState(false);
@@ -36,7 +39,9 @@ export default function Client({ email, onLogout }) {
         <button onClick={() => setTab('vehicles')}>Véhicules</button>
         <button onClick={() => setTab('customers')}>Clients</button>
         <button onClick={() => setTab('quotes')}>Devis</button>
+        <button onClick={() => setTab('drivers')}>Chauffeurs</button>
         <button onClick={onLogout} style={{ marginLeft: 'auto' }}>Se déconnecter</button>
+        <button onClick={()=>setTab('maintenance')}>Maintenance</button>
       </div>
 
       {tab === 'home' && (
@@ -49,6 +54,15 @@ export default function Client({ email, onLogout }) {
       {tab === 'vehicles' && <Vehicles />}
       {tab === 'customers' && <Customers />}
       {tab === 'quotes' && <Quotes />}
+      {tab === 'drivers' && <Drivers />}
+      {tab==='home' && (
+  <div style={{display:'grid',gridTemplateColumns:'1fr',gap:16, maxWidth:980}}>
+    
+    <AlertsWidget />
+  
+  </div>
+)}
+{tab==='maintenance' && <Maintenance />}
     </div>
   );
 }

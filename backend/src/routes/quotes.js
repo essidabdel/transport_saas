@@ -217,6 +217,32 @@ router.post('/:id/pdf', requireAuth, async (req,res)=>{
   const base = process.env.PUBLIC_BASE_URL || 'http://localhost:4000';
   res.json({ ok:true, pdf_url: `${base}/uploads/quotes/quote_${id}.pdf` });
 });
+router.post('/:id/status', requireAuth, async (req,res)=>{
+  const id = Number(req.params.id);
+  const { status } = req.body || {}; // 'DRAFT' | 'SENT' | 'ACCEPTED' | 'REJECTED'
+  if (!['DRAFT','SENT','ACCEPTED','REJECTED'].includes(status)) return res.status(400).json({error:'bad_status'});
+
+  const u = await pool.query('SELECT organization_id FROM users WHERE id=$1',[req.user.id]);
+  const org = u.rows[0]?.organization_id;
+  if (!org) return res.status(400).json({error:'no_org'});
+
+  const fields = { SENT:'sent_at', ACCEPTED:'accepted_at', REJECTED:'rejected_at' };
+  const setCols = [`status=$1`];
+  const vals = [status, org, id];
+
+  // reset timestamps then set the one for status
+  const q = `
+    UPDATE quotes
+       SET status=$1,
+           sent_at     = CASE WHEN $1='SENT'     THEN NOW() ELSE NULL END,
+           accepted_at = CASE WHEN $1='ACCEPTED' THEN NOW() ELSE NULL END,
+           rejected_at = CASE WHEN $1='REJECTED' THEN NOW() ELSE NULL END
+     WHERE organization_id=$2 AND id=$3
+     RETURNING *`;
+  const { rows } = await pool.query(q, vals);
+  if (!rows[0]) return res.status(404).json({error:'not_found'});
+  res.json(rows[0]);
+});
 
 
 module.exports = router;
