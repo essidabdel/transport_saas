@@ -38,3 +38,6 @@ app.use('/api/customers', require('./routes/customers'));
 app.use('/api/quotes', require('./routes/quotes'));
 app.use('/api/drivers', require('./routes/drivers'));
 app.use('/api/maintenance', require('./routes/maintenance'));
+app.use('/api/jobs', require('./routes/jobs'));
+app.use('/api/stats', require('./routes/stats'));
+app.use('/api/invoices', require('./routes/invoices'));

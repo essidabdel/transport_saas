@@ -10,6 +10,9 @@ import Quotes from './Quotes';
 import Drivers from './Drivers';
 import AlertsWidget from './AlertsWidget';
 import Maintenance from './Maintenance';
+import Jobs from './Jobs';
+import DashboardKPIs from './DashboardKPIs';
+import Invoices from './Invoices';
 
 export default function Client({ email, onLogout }) {
   const [ready, setReady] = useState(false);
@@ -42,6 +45,8 @@ export default function Client({ email, onLogout }) {
         <button onClick={() => setTab('drivers')}>Chauffeurs</button>
         <button onClick={onLogout} style={{ marginLeft: 'auto' }}>Se déconnecter</button>
         <button onClick={()=>setTab('maintenance')}>Maintenance</button>
+        <button onClick={()=>setTab('jobs')}>Missions</button>
+        <button onClick={()=>setTab('invoices')}>Factures</button>
       </div>
 
       {tab === 'home' && (
@@ -51,10 +56,19 @@ export default function Client({ email, onLogout }) {
         </div>
       )}
 
+
+      {tab==='home' && (
+  <div style={{display:'grid',gridTemplateColumns:'1fr',gap:16, maxWidth:980}}>
+    
+    <DashboardKPIs />
+  </div>
+)}
+
       {tab === 'vehicles' && <Vehicles />}
       {tab === 'customers' && <Customers />}
       {tab === 'quotes' && <Quotes />}
       {tab === 'drivers' && <Drivers />}
+      {tab==='jobs' && <Jobs />}
       {tab==='home' && (
   <div style={{display:'grid',gridTemplateColumns:'1fr',gap:16, maxWidth:980}}>
     
@@ -63,6 +77,7 @@ export default function Client({ email, onLogout }) {
   </div>
 )}
 {tab==='maintenance' && <Maintenance />}
+{tab==='invoices' && <Invoices />}
     </div>
   );
 }
