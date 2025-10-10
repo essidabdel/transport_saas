@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 
+import Signup from './Signup';
+
 export default function Login({ onLogin }) {
   const [email,setEmail]=useState('client@local.test');
   const [password,setPassword]=useState('Client123!');
   const [otp,setOtp]=useState('');
   const [err,setErr]=useState('');
+  const [mode,setMode]=useState('login');
 
   const submit = async (e)=>{
     e.preventDefault();
@@ -18,6 +21,8 @@ export default function Login({ onLogin }) {
     onLogin({ token: data.access_token, refresh: data.refresh_token, role: data.role, email: data.email });
   };
 
+  if (mode === 'signup') return <Signup onLogin={onLogin} onCancel={()=>setMode('login')} />;
+
   return (
     <div style={{maxWidth:360,margin:'64px auto',fontFamily:'sans-serif'}}>
       <h2>Connexion</h2>
@@ -27,6 +32,9 @@ export default function Login({ onLogin }) {
         <input placeholder="Code OTP (si activé)" value={otp} onChange={e=>setOtp(e.target.value)} style={s.i}/>
         <button type="submit" style={{width:'100%',padding:10}}>Se connecter</button>
       </form>
+      <div style={{marginTop:12}}>
+        <button onClick={()=>setMode('signup')} style={{background:'transparent',border:'none',color:'blue',cursor:'pointer'}}>Créer un compte</button>
+      </div>
       {err && <p style={{color:'red'}}>{err}</p>}
     </div>
   );

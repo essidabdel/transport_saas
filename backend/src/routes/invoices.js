@@ -244,6 +244,62 @@ router.post('/from-quote/:quoteId', requireAuth, async (req, res) => {
   }
 });
 
+// --- NOUVELLE ROUTE : création manuelle d'une facture -->
+router.post('/', requireAuth, async (req, res) => {
+  const org = await orgId(req); if (!org) return res.status(400).json({ error: 'no_org' });
+  const { customer_id, items = [], vat_rate = 0, due_date = null, currency = 'EUR', notes = null } = req.body || {};
+
+  if (!customer_id) return res.status(400).json({ error: 'missing_customer' });
+  if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ error: 'empty_items' });
+
+  // total HT
+  const total_ht = items.reduce((s, r) => s + Number(r.line_total != null ? r.line_total : (Number(r.qty || 0) * Number(r.unit_price || 0))), 0);
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const number = await nextNumber(org);
+
+    const ins = await client.query(
+      `INSERT INTO invoices(organization_id, customer_id, number, currency, notes, vat_rate, total_ht)
+       VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+      [org, customer_id, number, currency, notes, Number(vat_rate || 0), total_ht.toFixed(2)]
+    );
+    const invId = ins.rows[0].id;
+
+    // items insertion
+    const vals = [];
+    const ph = [];
+    items.forEach((it, idx) => {
+      vals.push(invId, it.label || null, Number(it.qty || 0), Number(it.unit_price || 0), Number(it.line_total != null ? it.line_total : (Number(it.qty || 0) * Number(it.unit_price || 0))));
+      const i = idx * 5;
+      ph.push(`($${i + 1},$${i + 2},$${i + 3},$${i + 4},$${i + 5})`);
+    });
+    await client.query(
+      `INSERT INTO invoice_items(invoice_id,label,qty,unit_price,line_total) VALUES ${ph.join(',')}`,
+      vals
+    );
+
+    // set due_date if provided
+    if (due_date) {
+      await client.query(`UPDATE invoices SET due_date=$1 WHERE id=$2 AND organization_id=$3`, [due_date, invId, org]);
+    }
+
+    // recompute totals/status
+    const updated = await recomputeInvoiceTotals(client, invId, org);
+
+    await client.query('COMMIT');
+    res.json({ ok: true, invoice: updated });
+  } catch (e) {
+    await client.query('ROLLBACK');
+    console.error(e);
+    res.status(500).json({ error: 'create_invoice_failed' });
+  } finally {
+    client.release();
+  }
+});
+
 /* ===========================================================
    4) Routes avec :id
    =========================================================== */

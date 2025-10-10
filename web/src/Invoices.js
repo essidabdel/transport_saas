@@ -24,6 +24,7 @@ export default function Invoices(){
   const [edit,setEdit]=useState(null); // {id, vat_rate, due_date}
   const [pay,setPay]=useState(null);   // {id, amount, paid_at, method, note}
   const [fStatus,setFStatus]=useState(''); // filtre: '', OVERDUE, PAID, SENT, CANCELLED
+  const [customers,setCustomers]=useState([]); // <-- nouveau: clients pour création manuelle
 
   const r2json = async (r)=> (r.ok ? r.json() : []);
 
@@ -35,6 +36,10 @@ export default function Invoices(){
 
     const q = await apiFetch('/api/quotes');
     if (q.ok) setQuotes(await r2json(q));
+
+    // fetch customers pour form de création manuelle
+    const c = await apiFetch('/api/customers');
+    if (c.ok) setCustomers(await r2json(c));
   }, [fStatus]);
 
   useEffect(()=>{ load(); }, [load]);
@@ -71,6 +76,40 @@ export default function Invoices(){
     const body={ amount:Number(pay.amount), paid_at:pay.paid_at, method:pay.method, note:pay.note||null };
     const r=await apiFetch(`/api/invoices/${pay.id}/payments`,{method:'POST',body:JSON.stringify(body)});
     if(r.ok){ setPay(null); load(); }
+  };
+
+  // ---------- Nouvel état local pour création manuelle ----------
+  const [newCustomerId, setNewCustomerId] = useState('');
+  const [newItems, setNewItems] = useState([{ label:'', qty:1, unit_price:0 }]);
+  const [newVat, setNewVat] = useState(0);
+  const [newDueDate, setNewDueDate] = useState('');
+  const [newNotes, setNewNotes] = useState('');
+
+  const addNewItem = ()=> setNewItems([...newItems, { label:'', qty:1, unit_price:0 }]);
+  const delNewItem = i => setNewItems(newItems.filter((_,idx)=>idx!==i));
+  const setNewItem = (i,k,v) => setNewItems(newItems.map((it,idx)=>idx===i?{...it,[k]:v}:it));
+
+  const subtotalNew = newItems.reduce((s,it)=> s + (Number(it.qty||0)*Number(it.unit_price||0)), 0);
+  const totalNew = subtotalNew * (1 + Number(newVat||0)/100);
+
+  const saveNewInvoice = async ()=>{
+    if (!newCustomerId) return alert('Choisir un client');
+    if (!newItems.length) return alert('Ajouter au moins une ligne');
+    const body = {
+      customer_id: Number(newCustomerId),
+      items: newItems.map(it=>({ label: it.label, qty: Number(it.qty||0), unit_price: Number(it.unit_price||0), line_total: Number(it.qty||0)*Number(it.unit_price||0) })),
+      vat_rate: Number(newVat||0),
+      due_date: newDueDate || null,
+      notes: newNotes || null
+    };
+    const r = await apiFetch('/api/invoices', { method:'POST', body: JSON.stringify(body) });
+    if (!r.ok) {
+      const e = await r.json().catch(()=>({error:'Erreur'}));
+      return alert(e.error || 'Erreur création facture');
+    }
+    // reset form + reload
+    setNewCustomerId(''); setNewItems([{ label:'', qty:1, unit_price:0 }]); setNewVat(0); setNewDueDate(''); setNewNotes('');
+    load();
   };
 
   return (
@@ -164,6 +203,50 @@ export default function Invoices(){
           </div>
         </Modal>
       )}
+
+      {/* --- NOUVELLE PARTIE : Création manuelle de facture --- */}
+      <h4 style={{marginTop:16}}>Nouvelle facture</h4>
+      <div style={{border:'1px solid #eee',borderRadius:8,padding:12,marginBottom:8}}>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 120px 200px',gap:8,alignItems:'end',maxWidth:900}}>
+          <label>Client
+            <select value={newCustomerId} onChange={e=>setNewCustomerId(e.target.value)} style={{width:'100%',padding:8}}>
+              <option value="">— Choisir —</option>
+              {customers.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </label>
+          <label>TVA (%)<input type="number" step="0.01" value={newVat} onChange={e=>setNewVat(e.target.value)} style={{width:'100%',padding:8}}/></label>
+          <label>Échéance<input type="date" value={newDueDate} onChange={e=>setNewDueDate(e.target.value)} style={{width:'100%',padding:8}}/></label>
+        </div>
+
+        <div style={{marginTop:8,borderTop:'1px solid #eee',paddingTop:8}}>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 100px 120px 80px',gap:8,fontWeight:600}}>
+            <div>Désignation</div><div>Qté</div><div>PU</div><div></div>
+          </div>
+          {newItems.map((it,i)=>(
+            <div key={i} style={{display:'grid',gridTemplateColumns:'1fr 100px 120px 80px',gap:8,marginTop:8,alignItems:'center'}}>
+              <input placeholder="Libellé" value={it.label} onChange={e=>setNewItem(i,'label',e.target.value)} />
+              <input type="number" step="any" value={it.qty} onChange={e=>setNewItem(i,'qty', Number(e.target.value))}/>
+              <input type="number" step="any" value={it.unit_price} onChange={e=>setNewItem(i,'unit_price', Number(e.target.value))}/>
+              <div style={{display:'flex',gap:6}}><button onClick={()=>delNewItem(i)}>Suppr</button></div>
+            </div>
+          ))}
+          <div style={{marginTop:8}}><button onClick={addNewItem}>+ Ligne</button></div>
+
+          <label style={{display:'block',marginTop:8}}>Notes
+            <textarea value={newNotes} onChange={e=>setNewNotes(e.target.value)} style={{width:'100%',height:80}} />
+          </label>
+
+          <div style={{marginTop:8,display:'flex',gap:8,alignItems:'center',justifyContent:'space-between'}}>
+            <div>
+              <div>Sous-total: {subtotalNew.toFixed(2)}</div>
+              <div>Total (TVA incl.): <b>{totalNew.toFixed(2)}</b></div>
+            </div>
+            <div>
+              <button onClick={saveNewInvoice} disabled={!newCustomerId}>Créer la facture</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
